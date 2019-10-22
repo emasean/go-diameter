@@ -65,6 +65,7 @@ var (
 	plmnID          = flag.String("plmnid", "\x00\xF1\x10", "Client (UE) PLMN ID")
 	vectors         = flag.Uint("vectors", 3, "Number Of Requested Auth Vectors")
 	completionSleep = flag.Uint("sleep", 10, "After Completion Sleep Time (seconds)")
+	imei            = flag.String("imei", "12345678901234", "Client (UE) IMEI")
 )
 
 func main() {
@@ -283,6 +284,14 @@ func sendULR(c diam.Conn, cfg *sm.Settings) error {
 	m.NewAVP(avp.RATType, avp.Mbit, uint32(*vendorID), datatype.Enumerated(1004))
 	m.NewAVP(avp.ULRFlags, avp.Vbit|avp.Mbit, uint32(*vendorID), datatype.Unsigned32(ULR_FLAGS))
 	m.NewAVP(avp.VisitedPLMNID, avp.Vbit|avp.Mbit, uint32(*vendorID), datatype.OctetString(*plmnID))
+        m.NewAVP(avp.TerminalInformation, avp.Vbit|avp.Mbit, uint32(*vendorID), &diam.GroupedAVP{
+                AVP: []*diam.AVP{
+                        diam.NewAVP(
+                                avp.IMEI, avp.Vbit|avp.Mbit, uint32(*vendorID), datatype.UTF8String(*imei)),
+                        diam.NewAVP(
+                                avp.SoftwareVersion, avp.Vbit|avp.Mbit, uint32(*vendorID), datatype.Unsigned32(825622528)),
+                },
+        })
 	log.Printf("\nSending ULR to %s\n%s\n", c.RemoteAddr(), m)
 	_, err := m.WriteTo(c)
 	return err
