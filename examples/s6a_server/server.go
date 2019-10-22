@@ -41,7 +41,7 @@ func main() {
 	realm := flag.String("diam_realm", "go-diameter", "diameter identity realm")
 	certFile := flag.String("cert_file", "", "tls certificate file (optional)")
 	keyFile := flag.String("key_file", "", "tls key file (optional)")
-	networkType := flag.String("network_type", "tcp", "protocol type tcp/sctp")
+	networkType := flag.String("network_type", "sctp", "protocol type tcp/sctp")
 	flag.Parse()
 
 	settings := &sm.Settings{
