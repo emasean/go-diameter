@@ -57,6 +57,7 @@ func main() {
 
 	mux.Handle("ULR", handleULR(*settings))
 	mux.Handle("AIR", handleAIR(*settings))
+	mux.Handle("CLR", handleCLR(*settings))
 	mux.HandleFunc("ALL", handleALL) // Catch all.
 
 	// Print error reports.
@@ -126,7 +127,7 @@ func handleAIR(settings sm.Settings) diam.HandlerFunc {
 		a.InsertAVP(diam.NewAVP(avp.SessionID, avp.Mbit, 0, req.SessionID))
 		a.NewAVP(avp.OriginHost, avp.Mbit, 0, settings.OriginHost)
 		a.NewAVP(avp.OriginRealm, avp.Mbit, 0, settings.OriginRealm)
-		a.NewAVP(avp.OriginStateID, avp.Mbit, 0, settings.OriginStateID)
+                a.NewAVP(avp.AuthSessionState, avp.Mbit, 0, datatype.Unsigned32(1))
 		_, err = sendAIA(settings, c, a)
 		if err != nil {
 			log.Printf("Failed to send AIA: %s", err.Error())
@@ -219,12 +220,52 @@ func handleULR(settings sm.Settings) diam.HandlerFunc {
 		a.NewAVP(avp.AuthSessionState, avp.Mbit, 0, req.AuthSessionState)
 		a.NewAVP(avp.OriginHost, avp.Mbit, 0, settings.OriginHost)
 		a.NewAVP(avp.OriginRealm, avp.Mbit, 0, settings.OriginRealm)
-		a.NewAVP(avp.OriginStateID, avp.Mbit, 0, settings.OriginStateID)
+                a.NewAVP(avp.AuthSessionState, avp.Mbit, 0, datatype.Unsigned32(1))
 		_, err = sendULA(settings, c, a)
 		if err != nil {
 			log.Printf("Failed to send ULA: %s", err.Error())
 		}
 	}
+}
+
+func sendCLA(settings sm.Settings, w io.Writer, m *diam.Message) (n int64, err error) {
+        return m.WriteTo(w)
+}
+
+func handleCLR(settings sm.Settings) diam.HandlerFunc {
+        type CLR struct {
+                SessionID               datatype.UTF8String       `avp:"Session-Id"`
+                OriginHost              datatype.DiameterIdentity `avp:"Origin-Host"`
+                OriginRealm             datatype.DiameterIdentity `avp:"Origin-Realm"`
+                AuthSessionState        datatype.UTF8String       `avp:"Auth-Session-State"`
+                UserName                string                    `avp:"User-Name"`
+                CancellationType        datatype.Unsigned32       `avp:"Cancellation-Type"`
+        }
+        return func(c diam.Conn, m *diam.Message) {
+                var err error
+                var req CLR
+                var code uint32
+
+                err = m.Unmarshal(&req)
+                if err != nil {
+                        err = fmt.Errorf("Unmarshal failed: %s", err)
+                        code = diam.UnableToComply
+                        log.Printf("Invalid CLR(%d): %s\n", code, err.Error())
+                } else {
+                        code = diam.Success
+                }
+
+                a := m.Answer(code)
+                // SessionID is required to be the AVP in position 1
+                a.InsertAVP(diam.NewAVP(avp.SessionID, avp.Mbit, 0, req.SessionID))
+                a.NewAVP(avp.OriginHost, avp.Mbit, 0, settings.OriginHost)
+                a.NewAVP(avp.OriginRealm, avp.Mbit, 0, settings.OriginRealm)
+                a.NewAVP(avp.AuthSessionState, avp.Mbit, 0, datatype.Unsigned32(1))
+		_, err = sendCLA(settings, c, a)
+                if err != nil {
+                        log.Printf("Failed to send CLA: %s", err.Error())
+                }
+        }
 }
 
 func printErrors(ec <-chan *diam.ErrorReport) {
